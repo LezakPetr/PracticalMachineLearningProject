@@ -1,0 +1,224 @@
+---
+title: "Practical Machine Learning project"
+author: "Petr Lezak"
+date: "2018-11-18"
+output: html_document
+---
+
+The goal of this project was to create a classification model for detecting how was unilaterall dumbell biceps curl done. Classification should be done by data from accelerometers. The classification is stored in varaible classe with 5 different possible values:
+
+- 'A' - according to the specification
+- 'B' - throwing the elbows to the front
+- 'C' - lifting the dumbell only halfway
+- 'D' - lowering the dumbell only halfway
+- 'E' - throwing the hips to the front
+
+My goal was to achieve at least 80% accuracy necessary to pass the test. 
+I have chosen multiple models with logistic regression. There are 5 models, each predicting if the classification is equal to one of 5 possible ones. Model with highest probability of positive result is chosen as prediction. I have trained models with all non-empty features from the test set and obtained accuracy cca 70% which is not enough. I have then added quadratic terms of these features (just squared, not mixed terms) and obtained accuracy about 90% which is more than enough.
+
+Let us begin with splitting training set to trainingData and testData. Also load verification data - this is the data for the quiz.
+
+```{r}
+library(caret);
+
+set.seed(88888);
+data <- read.csv('pml-training.csv');
+verification <- read.csv('pml-testing.csv');
+
+inTrain <- createDataPartition(y = data$classe, p = 0.7, list = FALSE);
+trainingData <- data[inTrain, ];
+testData <- data[-inTrain, ];
+```
+
+Let us define a function train that will train a model for given classification.
+
+```{r}
+train <- function(data, classification) {
+  glm(
+    I(classe == classification)~
+      num_window+
+      roll_belt+
+      pitch_belt+
+      yaw_belt+
+      total_accel_belt+
+      gyros_belt_x+
+      gyros_belt_y+
+      gyros_belt_z+
+      accel_belt_x+
+      accel_belt_y+
+      accel_belt_z+
+      magnet_belt_x+
+      magnet_belt_y+
+      magnet_belt_z+
+      roll_arm+
+      pitch_arm+
+      yaw_arm+
+      total_accel_arm+
+      gyros_arm_x+
+      gyros_arm_y+
+      gyros_arm_z+
+      accel_arm_x+
+      accel_arm_y+
+      accel_arm_z+
+      magnet_arm_x+
+      magnet_arm_y+
+      magnet_arm_z+
+      roll_dumbbell+
+      pitch_dumbbell+
+      total_accel_dumbbell+
+      yaw_dumbbell+
+      gyros_dumbbell_x+
+      gyros_dumbbell_y+
+      gyros_dumbbell_z+
+      accel_dumbbell_x+
+      accel_dumbbell_y+
+      accel_dumbbell_z+
+      magnet_dumbbell_x+
+      magnet_dumbbell_y+
+      magnet_dumbbell_z+
+      roll_forearm+
+      pitch_forearm+
+      yaw_forearm+
+      gyros_forearm_x+
+      gyros_forearm_y+
+      gyros_forearm_z+
+      accel_forearm_x+
+      accel_forearm_y+
+      accel_forearm_z+
+      magnet_forearm_x+
+      magnet_forearm_y+
+      magnet_forearm_z+
+      
+      I(num_window^2)+
+      I(roll_belt^2)+
+      I(pitch_belt^2)+
+      I(yaw_belt^2)+
+      I(total_accel_belt^2)+
+      I(gyros_belt_x^2)+
+      I(gyros_belt_y^2)+
+      I(gyros_belt_z^2)+
+      I(accel_belt_x^2)+
+      I(accel_belt_y^2)+
+      I(accel_belt_z^2)+
+      I(magnet_belt_x^2)+
+      I(magnet_belt_y^2)+
+      I(magnet_belt_z^2)+
+      I(roll_arm^2)+
+      I(pitch_arm^2)+
+      I(yaw_arm^2)+
+      I(total_accel_arm^2)+
+      I(gyros_arm_x^2)+
+      I(gyros_arm_y^2)+
+      I(gyros_arm_z^2)+
+      I(accel_arm_x^2)+
+      I(accel_arm_y^2)+
+      I(accel_arm_z^2)+
+      I(magnet_arm_x^2)+
+      I(magnet_arm_y^2)+
+      I(magnet_arm_z^2)+
+      I(roll_dumbbell^2)+
+      I(pitch_dumbbell^2)+
+      I(total_accel_dumbbell^2)+
+      I(yaw_dumbbell^2)+
+      I(gyros_dumbbell_x^2)+
+      I(gyros_dumbbell_y^2)+
+      I(gyros_dumbbell_z^2)+
+      I(accel_dumbbell_x^2)+
+      I(accel_dumbbell_y^2)+
+      I(accel_dumbbell_z^2)+
+      I(magnet_dumbbell_x^2)+
+      I(magnet_dumbbell_y^2)+
+      I(magnet_dumbbell_z^2)+
+      I(roll_forearm^2)+
+      I(pitch_forearm^2)+
+      I(yaw_forearm^2)+
+      I(gyros_forearm_x^2)+
+      I(gyros_forearm_y^2)+
+      I(gyros_forearm_z^2)+
+      I(accel_forearm_x^2)+
+      I(accel_forearm_y^2)+
+      I(accel_forearm_z^2)+
+      I(magnet_forearm_x^2)+
+      I(magnet_forearm_y^2)+
+      I(magnet_forearm_z^2)
+    ,
+    data = data, family = binomial(link = "logit")
+  );
+}
+```
+
+Now we uses the function train for building five different models, each for one classification.
+
+```{r results='hide', warning=FALSE}
+mA <- train(trainingData, 'A');
+mB <- train(trainingData, 'B');
+mC <- train(trainingData, 'C');
+mD <- train(trainingData, 'D');
+mE <- train(trainingData, 'E');
+```
+
+Let us define a function pred that returns vector of predictions for given data. This function applies 5 previously trained models to the data and for each sample returns classification with highest probability.
+
+```{r}
+pred <- function(data)
+{
+  a <- predict(mA, newdata = data);
+  b <- predict(mB, newdata = data);
+  c <- predict(mC, newdata = data);
+  d <- predict(mD, newdata = data);
+  e <- predict(mE, newdata = data);
+  
+  res <- vector(length = nrow(data))
+  
+  for (i in 1:nrow(data)) {
+    m <- max(a[i], b[i], c[i], d[i], e[i]);
+    
+    if (a[i] == m) {
+      res[i] <- 'A';
+    }
+    
+    if (b[i] == m) {
+      res[i] <- 'B';
+    }
+    
+    if (c[i] == m) {
+      res[i] <- 'C';
+    }
+    
+    if (d[i] == m) {
+      res[i] <- 'D';
+    }
+    
+    if (e[i] == m) {
+      res[i] <- 'E';
+    }
+  }
+  
+  res;
+}
+```
+
+Now we run the prediction on traing data and test data and print accuracies. Also we run the classification on verification data to solve the quiz - all of them are correct.
+
+```{r}
+predictTrain <- pred(trainingData)
+sum(predictTrain == trainingData$classe) / length(trainingData$classe)
+
+predictTest <- pred(testData)
+sum(predictTest == testData$classe) / length(testData$classe)
+
+predictVerification <- pred(verification)
+predictVerification
+```
+
+Finally we calculate confusion matrix for test set. Rows would be predicted classes, columns actual classes.
+
+```{r}
+classes <- c('A', 'B', 'C', 'D', 'E');
+confusion <- outer(classes, classes, Vectorize (FUN = function(x, y) {(fun = sum(predictTest == x & testData$classe == y))}));
+
+rownames(confusion) <- classes;
+colnames(confusion) <- classes;
+
+confusion
+```
